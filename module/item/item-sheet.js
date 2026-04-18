@@ -5,19 +5,14 @@
 export class HitosItemSheet extends ItemSheet {
   constructor(...args) {
     super(...args);
-
-    /**
-     * Keep track of the currently active sheet tab
-     * @type {string}
-     */
   }
   /** @override */
   static get defaultOptions() {
-    return mergeObject(super.defaultOptions, {
+    return foundry.utils.mergeObject(super.defaultOptions, {
       classes: ["hitos", "sheet", "item"],
       width: 500,
       height: 400,
-      tabs: [{ navSelector: ".sheet-tabs", contentSelector: ".sheet-body", initial: "description" }]
+      tabs: [{ navSelector: ".sheet-tabs", contentSelector: ".sheet-body", initial: "description" }],
     });
   }
 
@@ -26,10 +21,6 @@ export class HitosItemSheet extends ItemSheet {
     const path = "systems/hitos/templates/item";
     // Return a single sheet for all item types.
     return `${path}/${this.item.type}-sheet.html`;
-    // Alternatively, you could use the following return statement to do a
-    // unique item sheet by type, like `weapon-sheet.html`.
-
-    // return `${path}/${this.item.data.type}-sheet.html`;
   }
 
   /* -------------------------------------------- */
@@ -42,8 +33,8 @@ export class HitosItemSheet extends ItemSheet {
       editable: this.isEditable,
       item: baseData.item,
       system: baseData.item.system,
-      config: CONFIG.hitos
-    }
+      config: CONFIG.hitos,
+    };
     return sheetData;
   }
 

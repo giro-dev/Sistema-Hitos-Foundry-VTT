@@ -1,5 +1,5 @@
 /**
- * Extend the base Actor entity by defining a custom roll data structure which is ideal for the Simple system.
+ * Extend the base Actor document by defining a custom roll data structure which is ideal for the Hitos system.
  * @extends {Actor}
  */
 export class HitosActor extends Actor {
@@ -25,11 +25,10 @@ export class HitosActor extends Actor {
     if (this.img === "icons/svg/mystery-man.svg") this.img = img;
 
     super.prepareData();
-    const actorData = this;
 
     // Make separate methods for each Actor type (character, npc, etc.) to keep
     // things organized.
-    if (actorData.type === "npc" || actorData.type === "character") {
+    if (this.type === "npc" || this.type === "character") {
       this._prepareCharacterData();
       this._calculateRD();
       this._calculateDefense();
@@ -40,8 +39,7 @@ export class HitosActor extends Actor {
    * Prepare Character type specific data
    */
   _prepareCharacterData() {
-    const actorData = this;
-    const data = actorData.system;
+    const data = this.system;
 
     data.aguante.value =
       Number(data.atributos.for.value) +
@@ -54,7 +52,12 @@ export class HitosActor extends Actor {
     }
 
     data.resistencia.max = Number(data.aguante.value) * 3;
-    data.estabilidadMental.max = game.settings.get("hitos", "mentalHealthEnabled")? Number(data.entereza.value) * 3 : 0;
+    data.estabilidadMental.max = game.settings.get(
+      "hitos",
+      "mentalHealthEnabled"
+    )
+      ? Number(data.entereza.value) * 3
+      : 0;
 
     var resistencia = Number(data.resistencia.value);
     var resistencia_Max = Number(data.aguante.value);
@@ -79,16 +82,22 @@ export class HitosActor extends Actor {
       data.resistencia.mod = -5;
     }
 
-
     if (game.settings.get("hitos", "mentalHealthEnabled")) {
       var estMental = Number(data.estabilidadMental.value);
       var estMental_Max = Number(data.entereza.value);
 
       if (estMental < estMental_Max) {
-        data.estabilidadMental.status = game.i18n.format("Hitos.Mental.Cuerdo");
+        data.estabilidadMental.status = game.i18n.format(
+          "Hitos.Mental.Cuerdo"
+        );
         data.estabilidadMental.mod = 0;
-      } else if (estMental_Max <= estMental && estMental < 2 * estMental_Max) {
-        data.estabilidadMental.status = game.i18n.format("Hitos.Mental.Alterado");
+      } else if (
+        estMental_Max <= estMental &&
+        estMental < 2 * estMental_Max
+      ) {
+        data.estabilidadMental.status = game.i18n.format(
+          "Hitos.Mental.Alterado"
+        );
         data.estabilidadMental.mod = -2;
       } else if (
         2 * estMental_Max <= estMental &&
@@ -116,28 +125,29 @@ export class HitosActor extends Actor {
   }
 
   _calculateRD() {
-    const actorData = this;
     let RD = 0;
-    actorData.items.forEach((item) => {
+    this.items.forEach((item) => {
       if (item.type === "armor" && item.system.equipped === true) {
         RD += item.system.rd;
       }
     });
-    actorData.system.rd = RD;
+    this.system.rd = RD;
   }
 
-  _calculateDefense(){
+  _calculateDefense() {
     const data = this.system;
 
     data.defensa.normal =
-    Number(data.atributos.ref.value) +
-    (Number(data.habilidades.ffisica.value) >=
-    Number(data.habilidades.combate.value)
-      ? Number(data.habilidades.ffisica.value)
-      : Number(data.habilidades.combate.value)) +
-    5 +
-    Number(data.resistencia.mod) +
-    (game.settings.get("hitos", "mentalHealthEnabled") ? Number(data.estabilidadMental.mod) : 0);
-  data.defensa.des = Number(data.defensa.normal) - 2;
+      Number(data.atributos.ref.value) +
+      (Number(data.habilidades.ffisica.value) >=
+      Number(data.habilidades.combate.value)
+        ? Number(data.habilidades.ffisica.value)
+        : Number(data.habilidades.combate.value)) +
+      5 +
+      Number(data.resistencia.mod) +
+      (game.settings.get("hitos", "mentalHealthEnabled")
+        ? Number(data.estabilidadMental.mod)
+        : 0);
+    data.defensa.des = Number(data.defensa.normal) - 2;
   }
 }

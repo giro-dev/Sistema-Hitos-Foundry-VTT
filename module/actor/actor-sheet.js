@@ -1,4 +1,4 @@
-import { _onCheckRoll, _onInitRoll, _onAttackRoll, _onStatusRoll, _onDramaRoll} from '../dice.js';
+import { _onCheckRoll, _onInitRoll, _onAttackRoll, _onStatusRoll, _onDramaRoll } from "../dice.js";
 /**
  * Extend the basic ActorSheet with some very simple modifications
  * @extends {ActorSheet}
@@ -9,16 +9,18 @@ export class HitosActorSheet extends ActorSheet {
   }
   /** @override */
   static get defaultOptions() {
-    return mergeObject(super.defaultOptions, {
+    return foundry.utils.mergeObject(super.defaultOptions, {
       classes: ["hitos", "sheet", "actor"],
       template: "systems/hitos/templates/actor/actor-sheet.html",
       width: 740,
       height: 700,
-      tabs: [{
-        navSelector: ".sheet-tabs",
-        contentSelector: ".sheet-body",
-        initial: "stats",
-      }, ],
+      tabs: [
+        {
+          navSelector: ".sheet-tabs",
+          contentSelector: ".sheet-body",
+          initial: "stats",
+        },
+      ],
     });
   }
 
@@ -27,40 +29,36 @@ export class HitosActorSheet extends ActorSheet {
     const path = "systems/hitos/templates/actor";
     // Return a single sheet for all item types.
     return `${path}/${this.actor.type}-sheet.html`;
-    // Alternatively, you could use the following return statement to do a
-    // unique item sheet by type, like `weapon-sheet.html`.
-
-    // return `${path}/${this.item.data.type}-sheet.html`;
   }
   /* -------------------------------------------- */
   async _enrichTextFields(data, fieldNameArr) {
     for (let t = 0; t < fieldNameArr.length; t++) {
-      if (hasProperty(data, fieldNameArr[t])) {
-        setProperty(data, fieldNameArr[t], await TextEditor.enrichHTML(getProperty(data, fieldNameArr[t]), { async: true }));
+      if (foundry.utils.hasProperty(data, fieldNameArr[t])) {
+        foundry.utils.setProperty(
+          data,
+          fieldNameArr[t],
+          await TextEditor.enrichHTML(
+            foundry.utils.getProperty(data, fieldNameArr[t])
+          )
+        );
       }
-    };
+    }
   }
 
   /** @override */
   async getData() {
     const baseData = super.getData();
-    console.log(baseData)
     let sheetData = {
       editable: this.isEditable,
       actor: baseData.actor,
       system: baseData.actor.system,
       items: baseData.items,
-      dtypes: ["String", "Number", "Boolean"]
-    }
+      dtypes: ["String", "Number", "Boolean"],
+    };
     this._prepareCharacterItems(sheetData);
 
-
-    let enrichedFields = [
-      "system.biografia",
-      "system.extras",
-    ];
+    let enrichedFields = ["system.biografia", "system.extras"];
     await this._enrichTextFields(baseData, enrichedFields);
-
 
     return sheetData;
   }
@@ -74,8 +72,6 @@ export class HitosActorSheet extends ActorSheet {
 
     // Add Inventory Item
     html.find(".item-create").click(this._onItemCreate.bind(this));
-
-    //html.on("change", "div[contenteditable=true]", this._onChangeInput.bind(this));
 
     // Update Inventory Item
     html.find(".item-edit").click((ev) => {
@@ -95,34 +91,32 @@ export class HitosActorSheet extends ActorSheet {
     html.find(".item-quantity-plus").click((ev) => {
       ev.preventDefault();
       let item = this.actor.items.get(ev.currentTarget.dataset.itemid);
-      console.log(item);
-      event.preventDefault();
-      item.update({ "system.quantity":  item.system.quantity += 1 });
+      item.update({ "system.quantity": item.system.quantity + 1 });
     });
 
     // Decrease item quantity
     html.find(".item-quantity-minus").click((ev) => {
       ev.preventDefault();
       let item = this.actor.items.get(ev.currentTarget.dataset.itemid);
-      console.log(item);
-      event.preventDefault();
-      item.update({ "system.quantity":  item.system.quantity -= 1 });
+      item.update({ "system.quantity": item.system.quantity - 1 });
     });
 
     // Rollable abilities.
     html.find(".rollable-check").click((ev) => {
       ev.preventDefault();
       let habilidad = ev.currentTarget.dataset.habilidad;
-      let habilidadValor = getProperty(
+      let habilidadValor = foundry.utils.getProperty(
         this.actor.system,
         `habilidades.${habilidad}.value`
       );
-      let habilidadNombre = getProperty(
+      let habilidadNombre = foundry.utils.getProperty(
         this.actor.system,
         `habilidades.${habilidad}.label`
       );
-      var value = $(ev.currentTarget).attr('contenteditable');
-      if (value !== 'true') {_onCheckRoll(this.actor,habilidadValor,habilidadNombre);}
+      var value = $(ev.currentTarget).attr("contenteditable");
+      if (value !== "true") {
+        _onCheckRoll(this.actor, habilidadValor, habilidadNombre);
+      }
     });
 
     html.find(".rollable-init").click((ev) => {
@@ -133,26 +127,23 @@ export class HitosActorSheet extends ActorSheet {
     html.find(".rollable-attack").click((ev) => {
       ev.preventDefault();
       let weapon = this.actor.items.get(ev.currentTarget.dataset.itemid).system;
-      _onAttackRoll(this.actor,weapon);
+      _onAttackRoll(this.actor, weapon);
     });
 
     html.find(".rollable-status").click((ev) => {
       ev.preventDefault();
       let status = ev.currentTarget.dataset.status;
-      _onStatusRoll(this.actor,status);
+      _onStatusRoll(this.actor, status);
     });
-
-    //html.find('.stat-row').hover(ev => {$(ev.currentTarget).children('.spent-concept').toggleClass('hide');   })
 
     html.find(".habilidad-edit").click((ev) => {
       let element = $(ev.currentTarget).next(".label-body");
-      let value = element.attr('contenteditable');
+      let value = element.attr("contenteditable");
 
-      if (value == 'false') {
-        element.attr('contenteditable','true').removeClass('rollable-check');
-      }
-      else {
-        element.attr('contenteditable','false').addClass('rollable-check');
+      if (value == "false") {
+        element.attr("contenteditable", "true").removeClass("rollable-check");
+      } else {
+        element.attr("contenteditable", "false").addClass("rollable-check");
       }
     });
 
@@ -160,69 +151,100 @@ export class HitosActorSheet extends ActorSheet {
       $(ev.currentTarget).toggleClass("input-header-disabled");
     });
 
-
-    html.find(".item-toggle").click(ev => {
+    html.find(".item-toggle").click((ev) => {
       ev.preventDefault();
       let armor = this.actor.items.get(ev.currentTarget.dataset.itemid);
-      armor.update({data: {equipped: !armor.system.equipped}});
-      //armor.equipped = (armor.equipped === false ? true : false);
-      this.actor._calculateRD(this.actor)
-    })
+      armor.update({ "system.equipped": !armor.system.equipped });
+      this.actor._calculateRD(this.actor);
+    });
 
-    html.find(".health-inc").click(ev => {
+    html.find(".health-inc").click((ev) => {
       ev.preventDefault();
-      if ( this.actor.system.resistencia.consolidated >= this.actor.system.resistencia.max ) {
+      if (
+        this.actor.system.resistencia.consolidated >=
+        this.actor.system.resistencia.max
+      ) {
         return;
       }
 
-      if ( this.actor.system.resistencia.value >= this.actor.system.resistencia.max ) {
-        this.actor.update({ "system.resistencia.consolidated":  this.actor.system.resistencia.consolidated += 1 });
+      if (
+        this.actor.system.resistencia.value >=
+        this.actor.system.resistencia.max
+      ) {
+        this.actor.update({
+          "system.resistencia.consolidated":
+            this.actor.system.resistencia.consolidated + 1,
+        });
         return;
       }
 
-      this.actor.update({ "system.resistencia.value":  this.actor.system.resistencia.value += 1 });
-    })
+      this.actor.update({
+        "system.resistencia.value": this.actor.system.resistencia.value + 1,
+      });
+    });
 
-    html.find(".health-dec").click(ev => {
+    html.find(".health-dec").click((ev) => {
       ev.preventDefault();
-      if (this.actor.system.resistencia.value <= this.actor.system.resistencia.consolidated) {
+      if (
+        this.actor.system.resistencia.value <=
+        this.actor.system.resistencia.consolidated
+      ) {
         return;
       }
 
-      if ( this.actor.system.resistencia.value === 0 ) {
+      if (this.actor.system.resistencia.value === 0) {
         return;
       }
 
-      this.actor.update({ "system.resistencia.value":  this.actor.system.resistencia.value -= 1 });
-    })
+      this.actor.update({
+        "system.resistencia.value": this.actor.system.resistencia.value - 1,
+      });
+    });
 
-    html.find(".mental-inc").click(ev => {
+    html.find(".mental-inc").click((ev) => {
       ev.preventDefault();
-      if ( this.actor.system.estabilidadMental.consolidated >= this.actor.system.estabilidadMental.max ) {
+      if (
+        this.actor.system.estabilidadMental.consolidated >=
+        this.actor.system.estabilidadMental.max
+      ) {
         return;
       }
 
-      if ( this.actor.system.estabilidadMental.value >= this.actor.system.estabilidadMental.max ) {
-        this.actor.update({ "system.estabilidadMental.consolidated":  this.actor.system.estabilidadMental.consolidated += 1 });
+      if (
+        this.actor.system.estabilidadMental.value >=
+        this.actor.system.estabilidadMental.max
+      ) {
+        this.actor.update({
+          "system.estabilidadMental.consolidated":
+            this.actor.system.estabilidadMental.consolidated + 1,
+        });
         return;
       }
 
-      this.actor.update({ "system.estabilidadMental.value":  this.actor.system.estabilidadMental.value += 1 });
-    })
+      this.actor.update({
+        "system.estabilidadMental.value":
+          this.actor.system.estabilidadMental.value + 1,
+      });
+    });
 
-    html.find(".mental-dec").click(ev => {
+    html.find(".mental-dec").click((ev) => {
       ev.preventDefault();
-      if (this.actor.system.estabilidadMental.value <= this.actor.system.estabilidadMental.consolidated) {
+      if (
+        this.actor.system.estabilidadMental.value <=
+        this.actor.system.estabilidadMental.consolidated
+      ) {
         return;
       }
 
-      if ( this.actor.system.estabilidadMental.value === 0 ) {
+      if (this.actor.system.estabilidadMental.value === 0) {
         return;
       }
 
-      this.actor.update({ "system.estabilidadMental.value":  this.actor.system.estabilidadMental.value -= 1 });
-    })
-
+      this.actor.update({
+        "system.estabilidadMental.value":
+          this.actor.system.estabilidadMental.value - 1,
+      });
+    });
   }
 
   /* -------------------------------------------- */
@@ -232,24 +254,23 @@ export class HitosActorSheet extends ActorSheet {
    * @param {Event} event   The originating click event
    * @private
    */
-   async _onItemCreate(event) {
+  async _onItemCreate(event) {
     event.preventDefault();
     const header = event.currentTarget;
     // Get the type of item to create.
     const type = header.dataset.type;
     // Grab any data associated with this control.
-    const data = duplicate(header.dataset);
-    console.log(header.dataset)
+    const data = foundry.utils.duplicate(header.dataset);
     // Initialize a default name.
     const name = `New ${type.capitalize()}`;
     // Prepare the item object.
     const itemData = {
       name: name,
       type: type,
-      data: data,
+      system: data,
     };
     // Remove the type from the dataset since it's in the itemData.type prop.
-    delete itemsystem["type"];
+    delete itemData.system["type"];
 
     // Finally, create the item!
     return this.actor.createEmbeddedDocuments("Item", [itemData]);
@@ -263,7 +284,7 @@ export class HitosActorSheet extends ActorSheet {
    *
    * @return {undefined}
    */
-   async _prepareCharacterItems(sheetData) {
+  async _prepareCharacterItems(sheetData) {
     const actorData = sheetData.actor;
 
     // Initialize containers.
@@ -272,20 +293,19 @@ export class HitosActorSheet extends ActorSheet {
     const weapon = [];
 
     // Iterate through items, allocating to containers
-    // let totalWeight = 0;
     for (let i of sheetData.items) {
       let item = i.system;
-      i.img = i.img || DEFAULT_TOKEN;
+      i.img = i.img || CONST.DEFAULT_TOKEN;
       // Append to gear.
-      if (i.type === 'item') {
+      if (i.type === "item") {
         gear.push(i);
       }
       // Append to armor.
-      else if (i.type === 'armor') {
+      else if (i.type === "armor") {
         armor.push(i);
       }
       // Append to weapons.
-      else if (i.type === 'weapon') {
+      else if (i.type === "weapon") {
         weapon.push(i);
       }
     }
