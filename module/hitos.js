@@ -129,10 +129,6 @@ Hooks.once("init", async function () {
     return str.toLowerCase();
   });
 
-  Handlebars.registerHelper("enrich", function (str) {
-    return new Handlebars.SafeString(TextEditor.enrichHTML(str));
-  });
-
   Handlebars.registerHelper("times", function (n, content) {
     let result = "";
     for (let i = 0; i < n; ++i) {

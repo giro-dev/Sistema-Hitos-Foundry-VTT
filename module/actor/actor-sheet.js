@@ -261,6 +261,8 @@ export class HitosActorSheet extends ActorSheet {
     const type = header.dataset.type;
     // Grab any data associated with this control.
     const data = foundry.utils.duplicate(header.dataset);
+    // Remove the type from the dataset since it's in the itemData.type prop.
+    delete data["type"];
     // Initialize a default name.
     const name = `New ${type.capitalize()}`;
     // Prepare the item object.
@@ -269,8 +271,6 @@ export class HitosActorSheet extends ActorSheet {
       type: type,
       system: data,
     };
-    // Remove the type from the dataset since it's in the itemData.type prop.
-    delete itemData.system["type"];
 
     // Finally, create the item!
     return this.actor.createEmbeddedDocuments("Item", [itemData]);
