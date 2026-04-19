@@ -103,6 +103,8 @@
   "Hitos.Maximo": "Maximum",
   "Hitos.EnableMentalHealth": "Enable sanity",
   "Hitos.EnableMentalHealthHint": "Enable if your game includes sanity (unspeakable cults)",
+  "Hitos.GameModule": "Game Module",
+  "Hitos.GameModuleHint": "Select the game module to enable module-specific skills",
   "Hitos.CultosInnombrables": "Unspeakable Cults",
   "Hitos.LasCorrientesDelTiempo": "The Currents of Time",
   "Hitos.Core": "Core"

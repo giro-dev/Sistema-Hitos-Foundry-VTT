@@ -10,8 +10,8 @@ export function registerSettings() {
   });
 
   game.settings.register("hitos", "gameModule", {
-    name: "Hitos.EnableMentalHealth",
-    hint: "Hitos.EnableMentalHealthHint",
+    name: "Hitos.GameModule",
+    hint: "Hitos.GameModuleHint",
     scope: "world",
     config: true,
     requiresReload: true,

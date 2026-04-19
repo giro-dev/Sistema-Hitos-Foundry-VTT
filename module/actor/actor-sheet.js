@@ -192,7 +192,7 @@ export class HitosActorSheet extends HandlebarsApplicationMixin(ActorSheetV2) {
     const armor = this.document.items.get(target.dataset.itemid);
     if (armor) {
       armor.update({ "system.equipped": !armor.system.equipped });
-      this.document._calculateRD(this.document);
+      this.document._calculateRD();
     }
   }
 
