@@ -6,6 +6,8 @@ import { HitosActorSheet } from "./actor/actor-sheet.js";
 import { HitosItem } from "./item/item.js";
 import { HitosItemSheet } from "./item/item-sheet.js";
 import { registerSettings } from "./settings.js";
+import { CharacterData, NpcData, VehicleData, OrganizationData } from "./data/actor-data-models.js";
+import { ItemData, WeaponData, ArmorData } from "./data/item-data-models.js";
 
 Hooks.once("init", async function () {
 
@@ -28,6 +30,17 @@ Hooks.once("init", async function () {
   // Define custom Document classes
   CONFIG.Actor.documentClass = HitosActor;
   CONFIG.Item.documentClass = HitosItem;
+
+  // Register DataModels for actor types
+  CONFIG.Actor.dataModels.character = CharacterData;
+  CONFIG.Actor.dataModels.npc = NpcData;
+  CONFIG.Actor.dataModels.vehicle = VehicleData;
+  CONFIG.Actor.dataModels.organization = OrganizationData;
+
+  // Register DataModels for item types
+  CONFIG.Item.dataModels.item = ItemData;
+  CONFIG.Item.dataModels.weapon = WeaponData;
+  CONFIG.Item.dataModels.armor = ArmorData;
 
   CONFIG.hitos = hitos;
 

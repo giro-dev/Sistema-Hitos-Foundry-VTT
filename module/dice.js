@@ -167,87 +167,68 @@ export async function _onCheckRoll(actor, valor, habilidadNombre) {
     data: actor.system,
     config: CONFIG.hitos,
   };
-  let html = await renderTemplate(template, dialogData);
-  return new Promise((resolve) => {
-    new Dialog({
-      title: "Tirada",
-      content: html,
-      buttons: {
-        normal: {
-          label: game.i18n.localize("Hitos.Roll.Tirar"),
-          callback: async (html) => {
-            let values = await _rolld10(valor);
-            let total =
-              Number(
-                html[0].querySelectorAll("option:checked")[0].value
-              ) +
-              Number(
-                html[0].querySelectorAll(".bonus")[0].value
-              ) +
-              corduraMod +
-              resistenciaMod +
-              values[2];
-            let template =
-              "systems/hitos/templates/chat/chat-roll.html";
-            dialogData = {
-              title: game.i18n.localize(habilidadNombre),
-              total: total,
-              damage: null,
-              atributo: game.i18n.localize(
-                html[0].querySelectorAll("option:checked")[0].label
-              ),
-              dices: values[1],
-              actor: actor._id,
-              mods:
-                Number(valor) +
-                Number(
-                  html[0].querySelectorAll("option:checked")[0].value
-                ) +
-                Number(
-                  html[0].querySelectorAll(".bonus")[0].value
-                ) +
-                resistenciaMod +
-                corduraMod,
-              modsTooltip: _formatModsTooltip([
-                {
-                  value: Number(valor),
-                  key: habilidadNombre.replace("Hitos.", ""),
-                },
-                {
-                  value: Number(
-                    html[0].querySelectorAll("option:checked")[0]
-                      .value
-                  ),
-                  key: html[0]
-                    .querySelectorAll("option:checked")[0]
-                    .label.replace("Hitos.", "")
-                    .substring(0, 3),
-                },
-                {
-                  value: Number(
-                    html[0].querySelectorAll(".bonus")[0].value
-                  ),
-                  key: "Roll.Modificador",
-                },
-                { value: corduraMod, key: "EstabilidadMental" },
-                { value: resistenciaMod, key: "Resistencia" },
-              ]),
-              data: actor.system,
-              config: CONFIG.hitos,
-            };
-            html = await renderTemplate(template, dialogData);
-            ChatMessage.create({
-              content: html,
-              speaker: { alias: actor.name },
-              rolls: [values[0]],
-              rollMode: game.settings.get("core", "rollMode"),
-            });
-          },
-        },
+  let htmlContent = await renderTemplate(template, dialogData);
+
+  const result = await foundry.applications.api.DialogV2.prompt({
+    window: { title: "Tirada" },
+    content: htmlContent,
+    ok: {
+      label: game.i18n.localize("Hitos.Roll.Tirar"),
+      callback: async (event, button, dialog) => {
+        const form = dialog.querySelector("form") ?? dialog;
+        let values = await _rolld10(valor);
+        let selectedOption = form.querySelector("option:checked");
+        let bonusInput = form.querySelector(".bonus");
+        let total =
+          Number(selectedOption?.value ?? 0) +
+          Number(bonusInput?.value ?? 0) +
+          corduraMod +
+          resistenciaMod +
+          values[2];
+        let chatTemplate = "systems/hitos/templates/chat/chat-roll.html";
+        let chatData = {
+          title: game.i18n.localize(habilidadNombre),
+          total: total,
+          damage: null,
+          atributo: game.i18n.localize(selectedOption?.label ?? ""),
+          dices: values[1],
+          actor: actor._id,
+          mods:
+            Number(valor) +
+            Number(selectedOption?.value ?? 0) +
+            Number(bonusInput?.value ?? 0) +
+            resistenciaMod +
+            corduraMod,
+          modsTooltip: _formatModsTooltip([
+            {
+              value: Number(valor),
+              key: habilidadNombre.replace("Hitos.", ""),
+            },
+            {
+              value: Number(selectedOption?.value ?? 0),
+              key: (selectedOption?.label ?? "")
+                .replace("Hitos.", "")
+                .substring(0, 3),
+            },
+            {
+              value: Number(bonusInput?.value ?? 0),
+              key: "Roll.Modificador",
+            },
+            { value: corduraMod, key: "EstabilidadMental" },
+            { value: resistenciaMod, key: "Resistencia" },
+          ]),
+          data: actor.system,
+          config: CONFIG.hitos,
+        };
+        let html = await renderTemplate(chatTemplate, chatData);
+        ChatMessage.create({
+          content: html,
+          speaker: { alias: actor.name },
+          rolls: [values[0]],
+          rollMode: game.settings.get("core", "rollMode"),
+        });
       },
-      default: "normal",
-      close: () => resolve(null),
-    }).render(true);
+    },
   });
 }
 

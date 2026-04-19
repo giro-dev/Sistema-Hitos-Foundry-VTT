@@ -1,5 +1,9 @@
 export function addChatListeners(html) {
-  html.on("click", ".drama-roll", onDramaRoll);
+  // html may be a jQuery object or native element; handle both for v14 compat
+  const el = html instanceof HTMLElement ? html : html[0] ?? html;
+  el.querySelectorAll(".drama-roll").forEach((btn) => {
+    btn.addEventListener("click", onDramaRoll);
+  });
 }
 
 function sumDuplicate(arr) {
@@ -61,68 +65,61 @@ async function onDramaRoll(event) {
     config: CONFIG.hitos,
   };
 
-  let html = await renderTemplate(template, dialogData);
-  return new Promise((resolve) => {
-    new Dialog({
-      title: "Tirada",
-      content: html,
-      buttons: {
-        normal: {
-          label: game.i18n.localize("Hitos.Roll.Tirar"),
-          callback: async (html) => {
-            let selectedDices =
-              html[0].querySelectorAll(".check-dice:checked");
-            let afectar =
-              html[0].querySelectorAll(".check-affect:checked")[0].value;
-            let dicesNew = [];
-            let result = 0;
-            selectedDices.forEach((dice) => {
-              dicesNew.push(Number(dice.value));
-            });
-            let newRoll = await new Roll(
-              3 - Number(dicesNew.length) + "d10"
-            ).evaluate();
-            newRoll.terms[0].results.forEach((result) => {
-              dicesNew.push(result.result);
-            });
-            if (afectar === "1") {
-              result = Math.max(...sumDuplicate(dicesNew)) + mods;
-            } else {
-              result = Math.min(...negDuplicate(dicesNew)) + mods;
-            }
-            let damage = calculateDamage(
-              weaponDamage,
-              weaponKindBonus,
-              dicesNew.sort((a, b) => a - b)
-            );
-            let template =
-              "systems/hitos/templates/chat/chat-drama.html";
-            dialogData = {
-              title: game.i18n.localize("Drama"),
-              total: result,
-              damage: damage,
-              dicesOld: dicesOld,
-              dices: dicesNew.sort((a, b) => a - b),
-              actor: actor.id,
-              mods: mods,
-              modsTooltip: modsTooltip,
-              weaponDamage: weaponDamage,
-              weaponKindBonus: weaponKindBonus,
-              data: actor.system,
-              config: CONFIG.hitos,
-            };
-            html = await renderTemplate(template, dialogData);
-            ChatMessage.create({
-              content: html,
-              speaker: { alias: actor.name },
-              rolls: [newRoll],
-              rollMode: game.settings.get("core", "rollMode"),
-            });
-          },
-        },
+  let htmlContent = await renderTemplate(template, dialogData);
+
+  await foundry.applications.api.DialogV2.prompt({
+    window: { title: "Tirada" },
+    content: htmlContent,
+    ok: {
+      label: game.i18n.localize("Hitos.Roll.Tirar"),
+      callback: async (event, button, dialog) => {
+        const form = dialog.querySelector("form") ?? dialog;
+        let selectedDices = form.querySelectorAll(".check-dice:checked");
+        let afectar = form.querySelector(".check-affect:checked")?.value;
+        let dicesNew = [];
+        selectedDices.forEach((dice) => {
+          dicesNew.push(Number(dice.value));
+        });
+        let newRoll = await new Roll(
+          3 - Number(dicesNew.length) + "d10"
+        ).evaluate();
+        newRoll.terms[0].results.forEach((result) => {
+          dicesNew.push(result.result);
+        });
+        let result;
+        if (afectar === "1") {
+          result = Math.max(...sumDuplicate(dicesNew)) + mods;
+        } else {
+          result = Math.min(...negDuplicate(dicesNew)) + mods;
+        }
+        let damage = calculateDamage(
+          weaponDamage,
+          weaponKindBonus,
+          dicesNew.sort((a, b) => a - b)
+        );
+        let chatTemplate = "systems/hitos/templates/chat/chat-drama.html";
+        let chatData = {
+          title: game.i18n.localize("Drama"),
+          total: result,
+          damage: damage,
+          dicesOld: dicesOld,
+          dices: dicesNew.sort((a, b) => a - b),
+          actor: actor.id,
+          mods: mods,
+          modsTooltip: modsTooltip,
+          weaponDamage: weaponDamage,
+          weaponKindBonus: weaponKindBonus,
+          data: actor.system,
+          config: CONFIG.hitos,
+        };
+        let html = await renderTemplate(chatTemplate, chatData);
+        ChatMessage.create({
+          content: html,
+          speaker: { alias: actor.name },
+          rolls: [newRoll],
+          rollMode: game.settings.get("core", "rollMode"),
+        });
       },
-      default: "normal",
-      close: () => resolve(null),
-    }).render(true);
+    },
   });
 }
