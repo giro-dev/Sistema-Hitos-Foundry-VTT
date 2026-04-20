@@ -103,6 +103,8 @@
   "Hitos.Maximo": "Màxim",
   "Hitos.EnableMentalHealth": "Habilitar salut mental",
   "Hitos.EnableMentalHealthHint": "Marcar si el teu joc té salut mental (cultes innombrables)",
+  "Hitos.GameModule": "Mòdul de joc",
+  "Hitos.GameModuleHint": "Selecciona el mòdul de joc per habilitar habilitats específiques",
   "Hitos.CultosInnombrables": "Cultes Innombrables",
   "Hitos.LasCorrientesDelTiempo": "Els Corrents Del Temps",
   "Hitos.Core": "Core"

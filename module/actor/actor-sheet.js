@@ -1,298 +1,269 @@
-import { _onCheckRoll, _onInitRoll, _onAttackRoll, _onStatusRoll, _onDramaRoll} from '../dice.js';
+import { _onCheckRoll, _onInitRoll, _onAttackRoll, _onStatusRoll, _onDramaRoll } from "../dice.js";
+
+const { HandlebarsApplicationMixin } = foundry.applications.api;
+const { ActorSheetV2 } = foundry.applications.sheets;
+
 /**
- * Extend the basic ActorSheet with some very simple modifications
- * @extends {ActorSheet}
+ * Extend the basic ActorSheetV2 with Handlebars support for the Hitos system.
+ * @extends {HandlebarsApplicationMixin(ActorSheetV2)}
  */
-export class HitosActorSheet extends ActorSheet {
-  constructor(...args) {
-    super(...args);
-  }
+export class HitosActorSheet extends HandlebarsApplicationMixin(ActorSheetV2) {
+
   /** @override */
-  static get defaultOptions() {
-    return mergeObject(super.defaultOptions, {
-      classes: ["hitos", "sheet", "actor"],
+  static DEFAULT_OPTIONS = {
+    classes: ["hitos", "sheet", "actor"],
+    position: { width: 740, height: 700 },
+    actions: {
+      itemCreate: HitosActorSheet._onItemCreate,
+      itemEdit: HitosActorSheet._onItemEdit,
+      itemDelete: HitosActorSheet._onItemDelete,
+      itemQuantityPlus: HitosActorSheet._onItemQuantityPlus,
+      itemQuantityMinus: HitosActorSheet._onItemQuantityMinus,
+      rollCheck: HitosActorSheet._onRollCheck,
+      rollInit: HitosActorSheet._onRollInit,
+      rollAttack: HitosActorSheet._onRollAttack,
+      rollStatus: HitosActorSheet._onRollStatus,
+      habilidadEdit: HitosActorSheet._onHabilidadEdit,
+      itemToggle: HitosActorSheet._onItemToggle,
+      healthInc: HitosActorSheet._onHealthInc,
+      healthDec: HitosActorSheet._onHealthDec,
+      mentalInc: HitosActorSheet._onMentalInc,
+      mentalDec: HitosActorSheet._onMentalDec,
+    },
+    window: {
+      resizable: true,
+    },
+    form: {
+      submitOnChange: true,
+    },
+  };
+
+  /** @override */
+  static PARTS = {
+    sheet: {
       template: "systems/hitos/templates/actor/actor-sheet.html",
-      width: 740,
-      height: 700,
-      tabs: [{
-        navSelector: ".sheet-tabs",
-        contentSelector: ".sheet-body",
-        initial: "stats",
-      }, ],
-    });
-  }
+    },
+  };
 
   /** @override */
-  get template() {
-    const path = "systems/hitos/templates/actor";
-    // Return a single sheet for all item types.
-    return `${path}/${this.actor.type}-sheet.html`;
-    // Alternatively, you could use the following return statement to do a
-    // unique item sheet by type, like `weapon-sheet.html`.
-
-    // return `${path}/${this.item.data.type}-sheet.html`;
+  _getHeaderButtons() {
+    const buttons = super._getHeaderButtons();
+    return buttons;
   }
+
+  /**
+   * Dynamically select the correct template based on actor type.
+   */
+  _configureRenderOptions(options) {
+    super._configureRenderOptions(options);
+    // Override the template per actor type
+    this.constructor.PARTS.sheet.template =
+      `systems/hitos/templates/actor/${this.document.type}-sheet.html`;
+  }
+
   /* -------------------------------------------- */
-  async _enrichTextFields(data, fieldNameArr) {
-    for (let t = 0; t < fieldNameArr.length; t++) {
-      if (hasProperty(data, fieldNameArr[t])) {
-        setProperty(data, fieldNameArr[t], await TextEditor.enrichHTML(getProperty(data, fieldNameArr[t]), { async: true }));
-      }
-    };
-  }
 
   /** @override */
-  async getData() {
-    const baseData = super.getData();
-    console.log(baseData)
-    let sheetData = {
-      editable: this.isEditable,
-      actor: baseData.actor,
-      system: baseData.actor.system,
-      items: baseData.items,
-      dtypes: ["String", "Number", "Boolean"]
-    }
-    this._prepareCharacterItems(sheetData);
+  async _prepareContext(options) {
+    const context = await super._prepareContext(options);
+    const actor = this.document;
+    const source = actor.toObject();
+    const items = Array.from(actor.items);
 
+    context.editable = this.isEditable;
+    context.actor = actor;
+    context.system = actor.system;
+    context.items = items;
+    context.dtypes = ["String", "Number", "Boolean"];
+    context.cssClass = this.isEditable ? "editable" : "locked";
 
-    let enrichedFields = [
-      "system.biografia",
-      "system.extras",
-    ];
-    await this._enrichTextFields(baseData, enrichedFields);
+    // Classify items
+    this._prepareCharacterItems(context);
 
+    // Enrich HTML fields
+    context.enrichedBiografia = await TextEditor.enrichHTML(actor.system.biografia ?? "");
+    context.enrichedExtras = await TextEditor.enrichHTML(actor.system.extras ?? "");
 
-    return sheetData;
+    return context;
   }
 
-  /** @override */
-  activateListeners(html) {
-    super.activateListeners(html);
+  /* -------------------------------------------- */
 
-    // Everything below here is only needed if the sheet is editable
+  /** @override */
+  _onRender(context, options) {
+    super._onRender(context, options);
+
     if (!this.isEditable) return;
 
-    // Add Inventory Item
-    html.find(".item-create").click(this._onItemCreate.bind(this));
-
-    //html.on("change", "div[contenteditable=true]", this._onChangeInput.bind(this));
-
-    // Update Inventory Item
-    html.find(".item-edit").click((ev) => {
-      const li = $(ev.currentTarget).parents(".item");
-      const item = this.actor.items.get(li.data("itemId"));
-      item.sheet.render(true);
+    // Right-click on hito-disable to toggle class
+    this.element.querySelectorAll(".hito-disable").forEach((el) => {
+      el.addEventListener("contextmenu", (ev) => {
+        el.classList.toggle("input-header-disabled");
+      });
     });
-
-    // Delete Inventory Item
-    html.find(".item-delete").click((ev) => {
-      const li = $(ev.currentTarget).parents(".item");
-      this.actor.deleteEmbeddedDocuments("Item", [li.data("itemId")]);
-      li.slideUp(200, () => this.render(false));
-    });
-
-    // Increment item quantity
-    html.find(".item-quantity-plus").click((ev) => {
-      ev.preventDefault();
-      let item = this.actor.items.get(ev.currentTarget.dataset.itemid);
-      console.log(item);
-      event.preventDefault();
-      item.update({ "system.quantity":  item.system.quantity += 1 });
-    });
-
-    // Decrease item quantity
-    html.find(".item-quantity-minus").click((ev) => {
-      ev.preventDefault();
-      let item = this.actor.items.get(ev.currentTarget.dataset.itemid);
-      console.log(item);
-      event.preventDefault();
-      item.update({ "system.quantity":  item.system.quantity -= 1 });
-    });
-
-    // Rollable abilities.
-    html.find(".rollable-check").click((ev) => {
-      ev.preventDefault();
-      let habilidad = ev.currentTarget.dataset.habilidad;
-      let habilidadValor = getProperty(
-        this.actor.system,
-        `habilidades.${habilidad}.value`
-      );
-      let habilidadNombre = getProperty(
-        this.actor.system,
-        `habilidades.${habilidad}.label`
-      );
-      var value = $(ev.currentTarget).attr('contenteditable');
-      if (value !== 'true') {_onCheckRoll(this.actor,habilidadValor,habilidadNombre);}
-    });
-
-    html.find(".rollable-init").click((ev) => {
-      ev.preventDefault();
-      _onInitRoll(this.actor);
-    });
-
-    html.find(".rollable-attack").click((ev) => {
-      ev.preventDefault();
-      let weapon = this.actor.items.get(ev.currentTarget.dataset.itemid).system;
-      _onAttackRoll(this.actor,weapon);
-    });
-
-    html.find(".rollable-status").click((ev) => {
-      ev.preventDefault();
-      let status = ev.currentTarget.dataset.status;
-      _onStatusRoll(this.actor,status);
-    });
-
-    //html.find('.stat-row').hover(ev => {$(ev.currentTarget).children('.spent-concept').toggleClass('hide');   })
-
-    html.find(".habilidad-edit").click((ev) => {
-      let element = $(ev.currentTarget).next(".label-body");
-      let value = element.attr('contenteditable');
-
-      if (value == 'false') {
-        element.attr('contenteditable','true').removeClass('rollable-check');
-      }
-      else {
-        element.attr('contenteditable','false').addClass('rollable-check');
-      }
-    });
-
-    html.find(".hito-disable").contextmenu((ev) => {
-      $(ev.currentTarget).toggleClass("input-header-disabled");
-    });
-
-
-    html.find(".item-toggle").click(ev => {
-      ev.preventDefault();
-      let armor = this.actor.items.get(ev.currentTarget.dataset.itemid);
-      armor.update({data: {equipped: !armor.system.equipped}});
-      //armor.equipped = (armor.equipped === false ? true : false);
-      this.actor._calculateRD(this.actor)
-    })
-
-    html.find(".health-inc").click(ev => {
-      ev.preventDefault();
-      if ( this.actor.system.resistencia.consolidated >= this.actor.system.resistencia.max ) {
-        return;
-      }
-
-      if ( this.actor.system.resistencia.value >= this.actor.system.resistencia.max ) {
-        this.actor.update({ "system.resistencia.consolidated":  this.actor.system.resistencia.consolidated += 1 });
-        return;
-      }
-
-      this.actor.update({ "system.resistencia.value":  this.actor.system.resistencia.value += 1 });
-    })
-
-    html.find(".health-dec").click(ev => {
-      ev.preventDefault();
-      if (this.actor.system.resistencia.value <= this.actor.system.resistencia.consolidated) {
-        return;
-      }
-
-      if ( this.actor.system.resistencia.value === 0 ) {
-        return;
-      }
-
-      this.actor.update({ "system.resistencia.value":  this.actor.system.resistencia.value -= 1 });
-    })
-
-    html.find(".mental-inc").click(ev => {
-      ev.preventDefault();
-      if ( this.actor.system.estabilidadMental.consolidated >= this.actor.system.estabilidadMental.max ) {
-        return;
-      }
-
-      if ( this.actor.system.estabilidadMental.value >= this.actor.system.estabilidadMental.max ) {
-        this.actor.update({ "system.estabilidadMental.consolidated":  this.actor.system.estabilidadMental.consolidated += 1 });
-        return;
-      }
-
-      this.actor.update({ "system.estabilidadMental.value":  this.actor.system.estabilidadMental.value += 1 });
-    })
-
-    html.find(".mental-dec").click(ev => {
-      ev.preventDefault();
-      if (this.actor.system.estabilidadMental.value <= this.actor.system.estabilidadMental.consolidated) {
-        return;
-      }
-
-      if ( this.actor.system.estabilidadMental.value === 0 ) {
-        return;
-      }
-
-      this.actor.update({ "system.estabilidadMental.value":  this.actor.system.estabilidadMental.value -= 1 });
-    })
-
   }
 
+  /* -------------------------------------------- */
+  /*  Action Handlers                             */
   /* -------------------------------------------- */
 
   /**
-   * Handle creating a new Owned Item for the actor using initial data defined in the HTML dataset
-   * @param {Event} event   The originating click event
-   * @private
+   * Handle creating a new Owned Item for the actor using initial data defined in the HTML dataset.
+   * @param {PointerEvent} event   The originating click event
+   * @param {HTMLElement} target   The element that triggered the action
    */
-   async _onItemCreate(event) {
-    event.preventDefault();
-    const header = event.currentTarget;
-    // Get the type of item to create.
-    const type = header.dataset.type;
-    // Grab any data associated with this control.
-    const data = duplicate(header.dataset);
-    console.log(header.dataset)
-    // Initialize a default name.
+  static async _onItemCreate(event, target) {
+    const type = target.dataset.type;
+    const data = foundry.utils.duplicate(target.dataset);
+    delete data["type"];
     const name = `New ${type.capitalize()}`;
-    // Prepare the item object.
     const itemData = {
       name: name,
       type: type,
-      data: data,
+      system: data,
     };
-    // Remove the type from the dataset since it's in the itemData.type prop.
-    delete itemsystem["type"];
+    return this.document.createEmbeddedDocuments("Item", [itemData]);
+  }
 
-    // Finally, create the item!
-    return this.actor.createEmbeddedDocuments("Item", [itemData]);
+  static _onItemEdit(event, target) {
+    const li = target.closest(".item");
+    const item = this.document.items.get(li.dataset.itemId);
+    if (item) item.sheet.render(true);
+  }
+
+  static _onItemDelete(event, target) {
+    const li = target.closest(".item");
+    this.document.deleteEmbeddedDocuments("Item", [li.dataset.itemId]);
+  }
+
+  static _onItemQuantityPlus(event, target) {
+    const item = this.document.items.get(target.dataset.itemid);
+    if (item) item.update({ "system.quantity": item.system.quantity + 1 });
+  }
+
+  static _onItemQuantityMinus(event, target) {
+    const item = this.document.items.get(target.dataset.itemid);
+    if (item) item.update({ "system.quantity": item.system.quantity - 1 });
+  }
+
+  static _onRollCheck(event, target) {
+    const habilidad = target.dataset.habilidad;
+    const habilidadValor = foundry.utils.getProperty(
+      this.document.system,
+      `habilidades.${habilidad}.value`
+    );
+    const habilidadNombre = foundry.utils.getProperty(
+      this.document.system,
+      `habilidades.${habilidad}.label`
+    );
+    // Don't roll if the element is in contenteditable mode
+    if (target.getAttribute("contenteditable") === "true") return;
+    _onCheckRoll(this.document, habilidadValor, habilidadNombre);
+  }
+
+  static _onRollInit(event, target) {
+    _onInitRoll(this.document);
+  }
+
+  static _onRollAttack(event, target) {
+    const weapon = this.document.items.get(target.dataset.itemid)?.system;
+    if (weapon) _onAttackRoll(this.document, weapon);
+  }
+
+  static _onRollStatus(event, target) {
+    const status = target.dataset.status;
+    _onStatusRoll(this.document, status);
+  }
+
+  static _onHabilidadEdit(event, target) {
+    const labelEl = target.nextElementSibling;
+    if (!labelEl) return;
+    const isEditable = labelEl.getAttribute("contenteditable");
+    if (isEditable === "false" || !isEditable) {
+      labelEl.setAttribute("contenteditable", "true");
+      labelEl.classList.remove("rollable-check");
+    } else {
+      labelEl.setAttribute("contenteditable", "false");
+      labelEl.classList.add("rollable-check");
+    }
+  }
+
+  static _onItemToggle(event, target) {
+    const armor = this.document.items.get(target.dataset.itemid);
+    if (armor) {
+      armor.update({ "system.equipped": !armor.system.equipped });
+      this.document._calculateRD();
+    }
+  }
+
+  static _onHealthInc(event, target) {
+    const sys = this.document.system;
+    if (sys.resistencia.consolidated >= sys.resistencia.max) return;
+    if (sys.resistencia.value >= sys.resistencia.max) {
+      this.document.update({
+        "system.resistencia.consolidated": sys.resistencia.consolidated + 1,
+      });
+      return;
+    }
+    this.document.update({
+      "system.resistencia.value": sys.resistencia.value + 1,
+    });
+  }
+
+  static _onHealthDec(event, target) {
+    const sys = this.document.system;
+    if (sys.resistencia.value <= sys.resistencia.consolidated) return;
+    if (sys.resistencia.value === 0) return;
+    this.document.update({
+      "system.resistencia.value": sys.resistencia.value - 1,
+    });
+  }
+
+  static _onMentalInc(event, target) {
+    const sys = this.document.system;
+    if (sys.estabilidadMental.consolidated >= sys.estabilidadMental.max) return;
+    if (sys.estabilidadMental.value >= sys.estabilidadMental.max) {
+      this.document.update({
+        "system.estabilidadMental.consolidated":
+          sys.estabilidadMental.consolidated + 1,
+      });
+      return;
+    }
+    this.document.update({
+      "system.estabilidadMental.value": sys.estabilidadMental.value + 1,
+    });
+  }
+
+  static _onMentalDec(event, target) {
+    const sys = this.document.system;
+    if (sys.estabilidadMental.value <= sys.estabilidadMental.consolidated) return;
+    if (sys.estabilidadMental.value === 0) return;
+    this.document.update({
+      "system.estabilidadMental.value": sys.estabilidadMental.value - 1,
+    });
   }
 
   /* -------------------------------------------- */
   /**
    * Organize and classify Items for Character sheets.
    *
-   * @param {Object} actorData The actor to prepare.
-   *
+   * @param {Object} context The context to prepare.
    * @return {undefined}
    */
-   async _prepareCharacterItems(sheetData) {
-    const actorData = sheetData.actor;
-
-    // Initialize containers.
+  _prepareCharacterItems(context) {
     const gear = [];
     const armor = [];
     const weapon = [];
 
-    // Iterate through items, allocating to containers
-    // let totalWeight = 0;
-    for (let i of sheetData.items) {
-      let item = i.system;
-      i.img = i.img || DEFAULT_TOKEN;
-      // Append to gear.
-      if (i.type === 'item') {
-        gear.push(i);
-      }
-      // Append to armor.
-      else if (i.type === 'armor') {
-        armor.push(i);
-      }
-      // Append to weapons.
-      else if (i.type === 'weapon') {
-        weapon.push(i);
-      }
+    for (const item of context.items) {
+      item.img = item.img || CONST.DEFAULT_TOKEN;
+      if (item.type === "item") gear.push(item);
+      else if (item.type === "armor") armor.push(item);
+      else if (item.type === "weapon") weapon.push(item);
     }
 
-    // Assign and return
-    actorData.gear = gear;
-    actorData.armor = armor;
-    actorData.weapon = weapon;
+    context.actor.gear = gear;
+    context.actor.armor = armor;
+    context.actor.weapon = weapon;
   }
 }
