@@ -1,0 +1,79 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release version (e.g. 3.0.0). If omitted, the version from system.json is used.'
+        required: false
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Resolve version
+        id: vars
+        run: |
+          if [ "${{ github.event_name }}" = "push" ]; then
+            TAG="${GITHUB_REF#refs/tags/}"
+            VERSION="${TAG#v}"
+          elif [ -n "${{ github.event.inputs.version }}" ]; then
+            VERSION="${{ github.event.inputs.version }}"
+            TAG="v${VERSION}"
+          else
+            VERSION=$(jq -r '.version' system.json)
+            TAG="v${VERSION}"
+          fi
+          REPO="${{ github.repository }}"
+          ARTIFACT_NAME="Sistema-Hitos-Foundry-VTT-${VERSION}"
+          DOWNLOAD_URL="https://github.com/${REPO}/releases/download/${TAG}/${ARTIFACT_NAME}.zip"
+          MANIFEST_URL="https://github.com/${REPO}/releases/latest/download/system.json"
+          echo "version=${VERSION}"         >> "$GITHUB_OUTPUT"
+          echo "tag=${TAG}"                 >> "$GITHUB_OUTPUT"
+          echo "artifact=${ARTIFACT_NAME}"  >> "$GITHUB_OUTPUT"
+          echo "download=${DOWNLOAD_URL}"   >> "$GITHUB_OUTPUT"
+          echo "manifest=${MANIFEST_URL}"   >> "$GITHUB_OUTPUT"
+
+      - name: Update system.json (version, manifest, download)
+        run: |
+          jq --arg v  "${{ steps.vars.outputs.version }}" \
+             --arg m  "${{ steps.vars.outputs.manifest }}" \
+             --arg d  "${{ steps.vars.outputs.download }}" \
+             '.version = $v | .manifest = $m | .download = $d' \
+             system.json > system.json.tmp
+          mv system.json.tmp system.json
+          cat system.json
+
+      - name: Build release zip
+        run: |
+          STAGE="${{ steps.vars.outputs.artifact }}"
+          mkdir -p "build/${STAGE}"
+          rsync -a \
+            --exclude '.git' \
+            --exclude '.github' \
+            --exclude '.idea' \
+            --exclude 'build' \
+            --exclude '*.zip' \
+            ./ "build/${STAGE}/"
+          (cd build && zip -r "${STAGE}.zip" "${STAGE}")
+          ls -lh build
+
+      - name: Create / update GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.vars.outputs.tag }}
+          name: ${{ steps.vars.outputs.tag }}
+          draft: false
+          prerelease: false
+          files: |
+            build/${{ steps.vars.outputs.artifact }}.zip
+            system.json
